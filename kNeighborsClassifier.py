@@ -160,10 +160,13 @@ if __name__ == "__main__":
         plt.show()
     # cv2.waitKey(0)
 
-    # END of knn
+    # ENDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD FİRST ALGORİTHMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 
     # Start bayesin network
-    modelGNB = GaussianNB()
+
+    var_smoothing = 1e-9
+
+    modelGNB = GaussianNB(var_smoothing=var_smoothing)
     y_prediction = modelGNB.fit(trainData, trainLabels).predict(testData)
 
     print("For Bayesian Number of mislabeled points out of a total %d points : %d" % (
