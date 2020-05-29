@@ -1,180 +1,126 @@
-# First let's import our libraries
-import graphviz as graphviz
-import struct
+# First Libraries
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import sklearn
 from sklearn import datasets
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+
 from sklearn.naive_bayes import GaussianNB
-from sklearn import tree
 
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.model_selection import KFold
+import torch
+import torchvision
 
-
-def read_data_from_file(filename):
-    with open(filename, 'rb') as f:
-        zero, data_type, dims = struct.unpack('>HBB', f.read(4))
-        shape = tuple(struct.unpack('>I', f.read(4))[0] for d in range(dims))
-        return np.fromstring(f.read(), dtype=np.uint(8).reshape(shape))
-
-
-# Homework idea: Crowss validation 10 iterasyon yap her iterasyondan %10 test fakat o test datası farklı bölgeden
 if __name__ == "__main__":
+
+    # loaded minst database and for start training neigbors with API
+    n_epochs = 3
+    batch_size_train = 60000
+    batch_size_test = 1000
+    learning_rate = 0.01
+    momentum = 0.5
+    log_interval = 10
+
+    random_seed = 1
+    torch.backends.cudnn.enabled = False
+    torch.manual_seed(random_seed)
+
+    train_loader = torch.utils.data.DataLoader(
+        torchvision.datasets.MNIST('/files/', train=True, download=True,
+                                   transform=torchvision.transforms.Compose([
+                                       torchvision.transforms.ToTensor(),
+                                       torchvision.transforms.Normalize(
+                                           (0.1307,), (0.3081,))
+                                   ])),
+        batch_size=batch_size_train, shuffle=True)
+
+    test_loader = torch.utils.data.DataLoader(
+        torchvision.datasets.MNIST('/files/', train=False, download=True,
+                                   transform=torchvision.transforms.Compose([
+                                       torchvision.transforms.ToTensor(),
+                                       torchvision.transforms.Normalize(
+                                           (0.1307,), (0.3081,))
+                                   ])),
+        batch_size=batch_size_test, shuffle=True)
+    data = enumerate(train_loader)
+    batch_idx, (example_data, example_targets) = next(data)
+    print(example_data.shape)
+
+    X_train = example_data.reshape(batch_size_train, 1 * 28 * 28)
+
     # loaded minst database and for start training neigbors
-
-    """raw_train = read_data_from_file("train-images-idx3-ubyte")
-    train_data = np.reshape(raw_train, (60000, 28 * 28))
-    train__label = read_data_from_file("train-labels-idx1-ubyte")
-
-    raw_test = read_data_from_file("t10k-images-idx3-ubyte")
-    test_data = np.reshape(raw_test, (7, 28 * 28))
-    test_label = read_data_from_file("t10k-labels-idx1-ubyte")
-
-    idx = (train__label == 2) | (train__label ==3 ) | (train__label == 8)
-
-    X = train_data[idx]
-    Y = train__label[idx]
-    """
-
-    data = datasets.load_digits()
-    # samples in data
+    # data = datasets.load_digits()
+    """# samples in data
     print(data.data.shape)
     print(data.keys())
     # target value?
     print("target")
     print(data.target.shape)
     print(data.feature_names)
-    # print(data.DESCR)
-
-    # conver frema to pandas
-    data_df = pd.DataFrame(data.data)
-
-    data_df.columns = data.feature_names
-    data_df["PRICE"] = data.target
-
-    # taking data from minst and choose percentage for each test data
-    (trainData, testData, trainLabels, testLabels) = train_test_split(np.array(data.data), data.target, test_size=0.1,
-                                                                      random_state=46)
-
-    (trainData, valData, trainLabels, valLabels) = train_test_split(trainData, trainLabels, test_size=0.1,
-                                                                    random_state=84)
-
-    """" 10 farklı parçaya bölüm her bir iterasyonda farklı bir kısma test uygulamaya çalıştım
-
-    test_data = np.array(data.data)
-
-    kf = KFold(n_splits=10)
-    # for train_index, test_index in kf.split(np.array(data.data)):
-    # print("TRAIN:", train_index, "TEST:", test_index)
-    print(kf)
-
-
-    sss = StratifiedShuffleSplit(n_splits=10, test_size=0.1, random_state=0)
-    sss.get_n_splits(test_data)
-    for train_index, test_index in sss.split(test_data):
-        X_train, X_test = test_data[train_index], test_data[test_index]
-        y_train, y_test = test_data[train_index], test_data[test_index]
     """
+    """# taking data from minst and choose percentage for each test data
+        (trainData, testData, trainLabels, testLabels) = train_test_split(np.array(data.data), data.target, test_size=0.1,
+                                                                          random_state=46)"""
 
-    # show the sizes of each data split
+    # split date for train test and validation
+    (trainData, testData, trainLabels, testLabels) = train_test_split(X_train,
+                                                                      example_targets,
+                                                                      test_size=0.1)
+
+    (trainData, valData, trainLabels, valLabels) = train_test_split(trainData, trainLabels, test_size=0.1)
+
+    # print train validate and test data
 
     print("training data points: {}".format(len(trainLabels)))
     print("validation data points: {}".format(len(valLabels)))
     print("testing data points: {}".format(len(testLabels)))
-    # initialize the values of k for our k-Nearest Neighbor classifier along with the
-    # list of accuracies for each value of k
 
-    kVals = range(1, 20, 1)
+    # initialize the values of k for our k-Nearest Neighbor classifier along with the
+    # list of accuracies for each parameter
+
+    kVals = range(1, 10, 1)
+
     accuracies = []
     accuraciesName = []
-    uniformList = ['uniform', 'distance']
-    algorithmList = ['auto', 'ball_tree', 'kd_tree', 'brute']
-    # loop over various values of `k` for the k-Nearest Neighbor classifier
+    # Distance better than uniform that's why comment out
+    # uniformList = ['uniform', 'distance']
 
-    for k in range(1, 15, 1):
+    uniformList = ['distance']
+    # All algorithm is same
+    # algorithmList = ['auto', 'ball_tree', 'kd_tree', 'brute']
+    algorithmList = ['auto']
+    # loop over various parameters for the k-Nearest Neighbor classifier
+    leaf_size = range(1, 2, 1)
 
-        for weights in uniformList:
-            for algorithm in algorithmList:
+    for k in kVals:
+        for leaf in leaf_size:
+            for weights in uniformList:
                 # train the k-Nearest Neighbor classifier with the current value of `k`
-
-                model = KNeighborsClassifier(n_neighbors=k, weights=weights, algorithm=algorithm)
+                model = KNeighborsClassifier(n_neighbors=k, weights=weights, leaf_size=leaf)
+                # Giving train data  of k-Nearest Neighbor classifier
                 model.fit(trainData, trainLabels)
-                # model.fit(X, Y)
-                # evaluate the model and update the accuracies list
+                # Testing validation data for best parameter
                 score = model.score(valData, valLabels)
-                print("k=%d, accuracy=%.2f%% for %s and %s" % (k, score * 100, weights, algorithm))
-                name = 'k: ' + str(k) + ' weights: ' + str(weights) + ' algorithm: ' + str(algorithm);
+                print("k=%d, accuracy=%.2f%% for %s and %s" % (k, score * 100, weights, leaf))
+                name = 'k: ' + str(k) + ' weights: ' + str(weights) + ' leaf_size: ' + str(leaf)
 
                 accuracies.append(score)
                 accuraciesName.append(name)
 
     # find the value of k that has the largest accuracy
-
     i = np.argmax(accuracies)
     print("name: %s achieved highest accuracy of %.2f%% on validation data for uniform" % (
         accuraciesName[i], accuracies[i] * 100))
 
-    # re-train our classifier using the best k value and predict the labels of the
     # test data
     splitParameter = accuraciesName[i].split()
     model = KNeighborsClassifier(n_neighbors=int(splitParameter[1]), weights=splitParameter[3],
-                                 algorithm=splitParameter[5])
+                                 leaf_size=int(splitParameter[5]))
     model.fit(trainData, trainLabels)
     predictions = model.predict(testData)
-    # print(predictions[1])
 
-    # show a final classification report demonstrating the accuracy of the classifier
-    # for each of the digits
-
-    print("EVALUATION ON TESTING DATA")
+    print("EVALUATION ON TESTING DATA for KNN")
     print(classification_report(testLabels, predictions))
 
-    print("Confusion matrix")
+    print("Confusion matrix for KNN")
     print(confusion_matrix(testLabels, predictions))
-
-    # loop over a few random digits
-
-    for i in np.random.randint(0, high=len(testLabels), size=(5,)):
-        # grab the image and classify it
-        image = testData[i]
-        prediction = model.predict([image])[0]
-        # convert the image for a 64-dim array to an 8 x 8 image compatible with OpenCV,
-        # then resize it to 32 x 32 pixels so we can see it better
-        ##         image = image.reshape((64, 64))
-        ##         image = exposure.rescale_intensity(image, out_range=(0, 255))
-        ##         image = imutils.resize(image, width=32, inter=cv2.INTER_CUBIC)
-
-        # show the prediction
-
-        imgdata = np.array(image, dtype='float')
-        pixels = imgdata.reshape((8, 8))
-        plt.imshow(pixels, cmap='gray')
-        plt.annotate(prediction, (3, 3), bbox={'facecolor': 'white'}, fontsize=16)
-        print("i think tha digit is : {}".format(prediction))
-        # cv2.imshow("image", image)
-        plt.show()
-    # cv2.waitKey(0)
-
-    # ENDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD FİRST ALGORİTHMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
-
-    # Start bayesin network
-
-    var_smoothing = 1e-9
-
-    modelGNB = GaussianNB(var_smoothing=var_smoothing)
-    y_prediction = modelGNB.fit(trainData, trainLabels).predict(testData)
-
-    print("For Bayesian Number of mislabeled points out of a total %d points : %d" % (
-        testData.shape[0], (testLabels != y_prediction).sum()))
-
-    # Start Tree Clasifierr
-
-    clf = tree.DecisionTreeClassifier()
-    y_prediction_for_tree = clf.fit(trainData, trainLabels).predict(testData)
-    print("FOR TREE Number of mislabeled points out of a total %d points : %d" % (
-        testData.shape[0], (testLabels != y_prediction_for_tree).sum()))
